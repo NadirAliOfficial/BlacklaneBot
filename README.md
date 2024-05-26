@@ -73,3 +73,4 @@ app/src/main/java/com/blacklanebot/
 - Tested against Blacklane Chauffeur app UI as of June 2026
 - If Blacklane updates their app UI, the accessibility node detection may need re-tuning
 - The bot does not store or transmit any account data
+
