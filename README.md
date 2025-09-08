@@ -74,4 +74,3 @@ app/src/main/java/com/blacklanebot/
 - If Blacklane updates their app UI, the accessibility node detection may need re-tuning
 - The bot does not store or transmit any account data
 
-
