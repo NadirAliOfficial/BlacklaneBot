@@ -31,6 +31,11 @@ class BlacklaneNotificationListener : NotificationListenerService() {
 
         Log.d(TAG, "Blacklane notification: title=$title text=$text")
 
+        if (BlacklaneNotificationListener.instance?.let { TrialManager.isExpired(it) } == true) {
+            Log.d(TAG, "Trial expired — ignoring notification")
+            return
+        }
+
         // Trigger on any new offer notification
         if (title.contains("offer", ignoreCase = true) ||
             text.contains("offer", ignoreCase = true) ||

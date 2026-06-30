@@ -54,6 +54,12 @@ class BlacklaneAccessibilityService : AccessibilityService() {
     }
 
     private fun scanOffersScreen() {
+        if (TrialManager.isExpired(this)) {
+            Log.d(TAG, "Trial expired — bot disabled")
+            pendingOfferCheck = false
+            return
+        }
+
         val root = rootInActiveWindow ?: run {
             Log.d(TAG, "No root window")
             return
