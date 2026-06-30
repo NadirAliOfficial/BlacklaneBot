@@ -20,19 +20,6 @@ object TrialManager {
         return System.currentTimeMillis() - first > TRIAL_MS
     }
 
-    fun millisRemaining(ctx: Context): Long {
-        val elapsed = System.currentTimeMillis() - firstLaunch(ctx)
-        return (TRIAL_MS - elapsed).coerceAtLeast(0)
-    }
-
-    fun formattedRemaining(ctx: Context): String {
-        val ms = millisRemaining(ctx)
-        val hours = ms / (1000 * 60 * 60)
-        val minutes = (ms % (1000 * 60 * 60)) / (1000 * 60)
-        val seconds = (ms % (1000 * 60)) / 1000
-        return String.format("%02dh %02dm %02ds", hours, minutes, seconds)
-    }
-
     private fun firstLaunch(ctx: Context): Long =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_FIRST_LAUNCH, System.currentTimeMillis())
 }

@@ -24,19 +24,12 @@ class MainActivity : Activity() {
     private lateinit var tvAccessibilityStatus: TextView
     private lateinit var tvBotStatus: TextView
     private lateinit var tvLastAction: TextView
-    private lateinit var tvTrialCountdown: TextView
     private lateinit var etMinHours: EditText
     private lateinit var etMaxHours: EditText
     private lateinit var expiredOverlay: LinearLayout
     private lateinit var mainContent: ScrollView
 
     private val handler = Handler(Looper.getMainLooper())
-    private val countdownTick = object : Runnable {
-        override fun run() {
-            updateTrialUI()
-            handler.postDelayed(this, 1000)
-        }
-    }
 
     private val botReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -54,7 +47,6 @@ class MainActivity : Activity() {
         tvAccessibilityStatus = findViewById(R.id.tvAccessibilityStatus)
         tvBotStatus = findViewById(R.id.tvBotStatus)
         tvLastAction = findViewById(R.id.tvLastAction)
-        tvTrialCountdown = findViewById(R.id.tvTrialCountdown)
         expiredOverlay = findViewById(R.id.expiredOverlay)
         mainContent = findViewById(R.id.mainContent)
         etMinHours = findViewById(R.id.etMinHours)
@@ -88,12 +80,11 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         updateStatusUI()
-        handler.post(countdownTick)
+        updateTrialUI()
     }
 
     override fun onPause() {
         super.onPause()
-        handler.removeCallbacks(countdownTick)
     }
 
     override fun onDestroy() {
@@ -105,11 +96,9 @@ class MainActivity : Activity() {
         if (TrialManager.isExpired(this)) {
             expiredOverlay.visibility = View.VISIBLE
             mainContent.visibility = View.INVISIBLE
-            tvTrialCountdown.text = "EXPIRED"
         } else {
             expiredOverlay.visibility = View.GONE
             mainContent.visibility = View.VISIBLE
-            tvTrialCountdown.text = TrialManager.formattedRemaining(this)
         }
     }
 
