@@ -23,20 +23,27 @@ class BlacklaneNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName != BotConfig.BLACKLANE_PACKAGE) return
-
         val extras = sbn.notification.extras
         val title = extras.getString("android.title") ?: ""
         val text = extras.getString("android.text") ?: ""
 
-        Log.d(TAG, "Blacklane notification: title=$title text=$text")
+        // Log every notification package so we can identify Blacklane's real package name
+        Log.d(TAG, "NOTIF pkg=${sbn.packageName} title=$title text=$text")
 
-        if (BlacklaneNotificationListener.instance?.let { TrialManager.isExpired(it) } == true) {
+        val isBlacklane = sbn.packageName == BotConfig.BLACKLANE_PACKAGE ||
+            sbn.packageName.contains("blacklane", ignoreCase = true) ||
+            title.contains("blacklane", ignoreCase = true) ||
+            title.contains("offer", ignoreCase = true) && text.contains("chauffeur", ignoreCase = true)
+
+        if (!isBlacklane) return
+
+        Log.d(TAG, "Blacklane notification matched: pkg=${sbn.packageName} title=$title text=$text")
+
+        if (TrialManager.isExpired(this)) {
             Log.d(TAG, "Trial expired — ignoring notification")
             return
         }
 
-        // Trigger on any new offer notification
         if (title.contains("offer", ignoreCase = true) ||
             text.contains("offer", ignoreCase = true) ||
             title.contains("new ride", ignoreCase = true)
@@ -44,8 +51,10 @@ class BlacklaneNotificationListener : NotificationListenerService() {
             Log.d(TAG, "New offer detected, signaling accessibility service")
             BlacklaneAccessibilityService.instance?.onOfferNotificationReceived()
 
-            // Open Blacklane app so accessibility service can read the screen
-            val launch = packageManager.getLaunchIntentForPackage(BotConfig.BLACKLANE_PACKAGE)
+            // Try known package first, fall back to matched package
+            val pkg = if (sbn.packageName.contains("blacklane", ignoreCase = true))
+                sbn.packageName else BotConfig.BLACKLANE_PACKAGE
+            val launch = packageManager.getLaunchIntentForPackage(pkg)
             launch?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             launch?.let { startActivity(it) }
         }
