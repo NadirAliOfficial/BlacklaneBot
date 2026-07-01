@@ -8,7 +8,7 @@ object BotConfig {
     private const val KEY_MIN_HOURS = "min_hours"
     private const val KEY_MAX_HOURS = "max_hours"
 
-    const val BLACKLANE_PACKAGE = "com.blacklane.chauffeurs"
+    const val BLACKLANE_PACKAGE = "com.blacklane.passenger"
 
     // Canadian provinces and major cities used to identify Canada rides
     val CANADA_KEYWORDS = setOf(
