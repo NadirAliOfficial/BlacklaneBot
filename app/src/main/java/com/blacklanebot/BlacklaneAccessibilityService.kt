@@ -2,12 +2,16 @@ package com.blacklanebot
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.graphics.Path
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.app.NotificationCompat
 
 class BlacklaneAccessibilityService : AccessibilityService() {
 
@@ -173,6 +177,7 @@ class BlacklaneAccessibilityService : AccessibilityService() {
                         pendingOfferCheck = false
                         BotLogger.log(this, "ACCEPTED")
                         notifyMainActivity("Accepted: $snippet")
+                        showAcceptedPopup(snippet)
                         accepted = true
                         break
                     } else {
@@ -211,6 +216,24 @@ class BlacklaneAccessibilityService : AccessibilityService() {
         val intent = android.content.Intent("com.blacklanebot.BOT_ACTION")
         intent.putExtra("message", message)
         sendBroadcast(intent)
+    }
+
+    fun showAcceptedPopup(detail: String) {
+        val channelId = "blbot_accepted"
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val ch = NotificationChannel(channelId, "Offer Accepted", NotificationManager.IMPORTANCE_HIGH)
+            ch.enableVibration(true)
+            nm.createNotificationChannel(ch)
+        }
+        val notif = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Offer Accepted")
+            .setContentText(detail)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(System.currentTimeMillis().toInt(), notif)
     }
 
     override fun onInterrupt() {
