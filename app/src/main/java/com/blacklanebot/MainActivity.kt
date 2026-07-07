@@ -28,14 +28,25 @@ class MainActivity : Activity() {
     private lateinit var etMaxHours: EditText
     private lateinit var expiredOverlay: LinearLayout
     private lateinit var mainContent: ScrollView
+    private lateinit var tvLog: TextView
+    private lateinit var logScroll: ScrollView
 
     private val handler = Handler(Looper.getMainLooper())
 
     private val botReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             val msg = intent.getStringExtra("message") ?: return
-            tvLastAction.text = "Last: $msg"
+            when (intent.action) {
+                "com.blacklanebot.BOT_ACTION" -> tvLastAction.text = "Last: $msg"
+                "com.blacklanebot.BOT_LOG" -> appendLog(msg)
+            }
         }
+    }
+
+    private fun appendLog(msg: String) {
+        BotLogger.append(msg)
+        tvLog.text = BotLogger.getLog()
+        logScroll.post { logScroll.fullScroll(android.view.View.FOCUS_DOWN) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +59,8 @@ class MainActivity : Activity() {
         tvBotStatus = findViewById(R.id.tvBotStatus)
         tvLastAction = findViewById(R.id.tvLastAction)
         expiredOverlay = findViewById(R.id.expiredOverlay)
+        tvLog = findViewById(R.id.tvLog)
+        logScroll = findViewById(R.id.logScroll)
         mainContent = findViewById(R.id.mainContent)
         etMinHours = findViewById(R.id.etMinHours)
         etMaxHours = findViewById(R.id.etMaxHours)
@@ -74,13 +87,13 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
         }
 
-        TestNotificationHelper.createChannel(this)
-
-        findViewById<Button>(R.id.btnTest).setOnClickListener {
-            TestNotificationHelper.sendMockNotification(this)
+        findViewById<Button>(R.id.btnClearLog).setOnClickListener {
+            tvLog.text = ""
+            BotLogger.clear()
         }
 
         registerReceiver(botReceiver, IntentFilter("com.blacklanebot.BOT_ACTION"))
+        registerReceiver(botReceiver, IntentFilter("com.blacklanebot.BOT_LOG"))
     }
 
     override fun onResume() {

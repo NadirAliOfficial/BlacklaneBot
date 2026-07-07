@@ -9,6 +9,7 @@ object BotConfig {
     private const val KEY_MAX_HOURS = "max_hours"
 
     const val BLACKLANE_PACKAGE = "com.blacklane.passenger"
+    const val MOCK_PACKAGE = "com.mockblacklane"
 
     // Canadian provinces and major cities used to identify Canada rides
     val CANADA_KEYWORDS = setOf(

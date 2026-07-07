@@ -3,7 +3,6 @@ package com.blacklanebot
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -24,7 +23,7 @@ class BlacklaneAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        Log.d(TAG, "Accessibility service started")
+        Log.i(TAG, "Accessibility service started")
     }
 
     override fun onDestroy() {
@@ -34,17 +33,52 @@ class BlacklaneAccessibilityService : AccessibilityService() {
 
     fun onOfferNotificationReceived() {
         pendingOfferCheck = true
-        Log.d(TAG, "Offer notification received, will process on next screen event")
-        // Schedule a scan after app opens (give it 2 seconds to load)
-        handler.postDelayed({ scanOffersScreen() }, 2000)
+        Log.i(TAG, "Offer notification received — opening notification shade to tap it")
+        // Open notification shade and tap the Blacklane notification (bypasses startActivity restrictions)
+        handler.postDelayed({
+            performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+            handler.postDelayed({ tapBlacklaneNotification() }, 1000)
+        }, 500)
+    }
+
+    private fun tapBlacklaneNotification() {
+        val root = rootInActiveWindow ?: return
+        val rootPkg = root.packageName?.toString() ?: ""
+        // Notification shade is hosted by systemui
+        if (!rootPkg.contains("systemui", ignoreCase = true) && rootPkg != "android") {
+            // Notification shade didn't open — fall back to direct scan
+            Log.i(TAG, "Shade not open (pkg=$rootPkg), scheduling direct scan in 2s")
+            handler.postDelayed({ scanOffersScreen() }, 2000)
+            return
+        }
+        // Find the Blacklane notification and tap it
+        val notifNode = findBlacklaneNotification(root)
+        if (notifNode != null) {
+            Log.i(TAG, "Tapping Blacklane notification in shade")
+            notifNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            handler.postDelayed({ scanOffersScreen() }, 2000)
+        } else {
+            Log.i(TAG, "Blacklane notification not found in shade — direct scan")
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            handler.postDelayed({ scanOffersScreen() }, 1500)
+        }
+    }
+
+    private fun findBlacklaneNotification(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val text = (root.text?.toString() ?: "") + (root.contentDescription?.toString() ?: "")
+        if (text.contains("blacklane", ignoreCase = true) || text.contains("New offer", ignoreCase = true)) {
+            if (root.isClickable) return root
+        }
+        for (i in 0 until root.childCount) {
+            val found = findBlacklaneNotification(root.getChild(i) ?: continue)
+            if (found != null) return found
+        }
+        return null
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
-        val isBlacklane = pkg == BotConfig.BLACKLANE_PACKAGE
-        val isMock = pkg == packageName // bot's own mock activity
-
-        if (!isBlacklane && !isMock) return
+        if (pkg != BotConfig.BLACKLANE_PACKAGE) return
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
@@ -59,165 +93,111 @@ class BlacklaneAccessibilityService : AccessibilityService() {
 
     private fun scanOffersScreen() {
         if (TrialManager.isExpired(this)) {
-            Log.d(TAG, "Trial expired — bot disabled")
+            Log.i(TAG, "Trial expired — bot disabled")
+            BotLogger.log(this, "ERROR: Trial expired")
             pendingOfferCheck = false
             return
         }
 
         val root = rootInActiveWindow ?: run {
-            Log.d(TAG, "No root window")
+            Log.i(TAG, "No root window")
             return
         }
 
-        if (root.packageName != BotConfig.BLACKLANE_PACKAGE) {
-            Log.d(TAG, "Not on Blacklane screen")
+        val rootPkg = root.packageName?.toString() ?: ""
+        if (rootPkg != BotConfig.BLACKLANE_PACKAGE) {
+            Log.i(TAG, "Not on Blacklane screen: $rootPkg")
             return
         }
 
-        Log.d(TAG, "Scanning offers screen")
+        Log.i(TAG, "Scanning offers screen")
+        BotLogger.log(this, "SCANNING screen for offers...")
         val minH = BotConfig.getMinHours(this)
         val maxH = BotConfig.getMaxHours(this)
 
-        // Collect all text from screen and find offer cards
-        val offerCards = findOfferCards(root)
-        Log.d(TAG, "Found ${offerCards.size} offer cards")
+        // Collect all leaf text nodes in document order, split by accept buttons into "cards"
+        val leaves = mutableListOf<AccessibilityNodeInfo>()
+        collectLeafNodes(root, leaves)
+        Log.i(TAG, "Total leaf nodes: ${leaves.size}")
 
-        for (card in offerCards) {
-            val text = extractFullText(card)
-            Log.d(TAG, "Card text: $text")
+        // Find positions of accept buttons (the "→" / "Accept offer" nodes)
+        val acceptIndices = leaves.indices.filter { i ->
+            val n = leaves[i]
+            val t = n.text?.toString() ?: ""
+            val d = n.contentDescription?.toString() ?: ""
+            t == "→" || d.contains("accept offer", ignoreCase = true) ||
+            t.contains("Accept offer") || t.contains("→")
+        }
 
-            if (OfferParser.isCanadaRide(text) && OfferParser.isWithinTimeWindow(text, minH, maxH)) {
-                Log.d(TAG, "MATCH FOUND - accepting offer")
-                val now = System.currentTimeMillis()
-                if (now - lastAcceptTime < 5000) {
-                    Log.d(TAG, "Too soon since last accept, skipping")
-                    continue
-                }
-                if (acceptOffer(card)) {
-                    lastAcceptTime = now
-                    pendingOfferCheck = false
-                    notifyMainActivity("Accepted: ${text.take(50)}")
-                    return
+        Log.i(TAG, "Found ${acceptIndices.size} accept buttons in leaf scan")
+        BotLogger.log(this, "FOUND ${acceptIndices.size} offer(s) on screen")
+
+        if (acceptIndices.isEmpty()) {
+            pendingOfferCheck = false
+            BotLogger.log(this, "No offers visible")
+            return
+        }
+
+        var accepted = false
+        for ((cardNum, acceptIdx) in acceptIndices.withIndex()) {
+            val acceptNode = leaves[acceptIdx]
+
+            // Card text = leaf nodes from after previous accept+price up to this accept button
+            val prevEnd = if (cardNum == 0) 0 else (acceptIndices[cardNum - 1] + 2)
+            val cardText = leaves.subList(prevEnd, acceptIdx)
+                .mapNotNull { it.text?.toString()?.takeIf { t -> t.isNotBlank() } }
+                .joinToString(" ")
+
+            Log.i(TAG, "Card $cardNum: $cardText")
+
+            val isCanada = OfferParser.isCanadaRide(cardText)
+            val inWindow = OfferParser.isWithinTimeWindow(cardText, minH, maxH)
+            val snippet = cardText.take(70)
+
+            when {
+                !isCanada -> BotLogger.log(this, "SKIP (not Canada): $snippet")
+                !inWindow -> BotLogger.log(this, "SKIP (outside ${minH}-${maxH}h): $snippet")
+                else -> {
+                    BotLogger.log(this, "MATCH — accepting: $snippet")
+                    val now = System.currentTimeMillis()
+                    if (now - lastAcceptTime < 5000) {
+                        BotLogger.log(this, "SKIP — too soon after last accept")
+                        continue
+                    }
+                    val r = android.graphics.Rect()
+                    acceptNode.getBoundsInScreen(r)
+                    if (!r.isEmpty) {
+                        Log.i(TAG, "Tapping accept at (${r.centerX()},${r.centerY()})")
+                        performTap(r.centerX().toFloat(), r.centerY().toFloat())
+                        lastAcceptTime = now
+                        pendingOfferCheck = false
+                        BotLogger.log(this, "ACCEPTED")
+                        notifyMainActivity("Accepted: $snippet")
+                        accepted = true
+                        break
+                    } else {
+                        BotLogger.log(this, "ACCEPT FAILED — button off screen")
+                    }
                 }
             }
         }
 
-        // If no matching card found, reset flag (no point rescanning without new notification)
-        pendingOfferCheck = false
+        if (!accepted) {
+            pendingOfferCheck = false
+            BotLogger.log(this, "DONE — no matching offers")
+        }
     }
 
-    private fun findOfferCards(root: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
-        val cards = mutableListOf<AccessibilityNodeInfo>()
-        collectCards(root, cards)
-        return cards
-    }
-
-    private fun collectCards(node: AccessibilityNodeInfo, result: MutableList<AccessibilityNodeInfo>) {
-        val text = collectNodeText(node)
-        // An offer card contains a time pattern and a price ($)
-        if (text.contains(Regex("\\d{1,2}:\\d{2}")) && text.contains("$")) {
-            result.add(node)
-            return // don't recurse into children of a found card
+    private fun collectLeafNodes(node: AccessibilityNodeInfo, result: MutableList<AccessibilityNodeInfo>) {
+        if (node.childCount == 0) {
+            val t = node.text?.toString() ?: ""
+            val d = node.contentDescription?.toString() ?: ""
+            if (t.isNotBlank() || d.isNotBlank()) result.add(node)
+            return
         }
         for (i in 0 until node.childCount) {
-            node.getChild(i)?.let { collectCards(it, result) }
+            node.getChild(i)?.let { collectLeafNodes(it, result) }
         }
-    }
-
-    private fun extractFullText(node: AccessibilityNodeInfo): String {
-        val sb = StringBuilder()
-        collectText(node, sb)
-        return sb.toString()
-    }
-
-    private fun collectText(node: AccessibilityNodeInfo, sb: StringBuilder) {
-        node.text?.let { sb.append(it).append(" ") }
-        node.contentDescription?.let { sb.append(it).append(" ") }
-        for (i in 0 until node.childCount) {
-            node.getChild(i)?.let { collectText(it, sb) }
-        }
-    }
-
-    private fun collectNodeText(node: AccessibilityNodeInfo): String {
-        return buildString {
-            fun recurse(n: AccessibilityNodeInfo) {
-                n.text?.let { append(it).append(" ") }
-                n.contentDescription?.let { append(it).append(" ") }
-                for (i in 0 until n.childCount) n.getChild(i)?.let { recurse(it) }
-            }
-            recurse(node)
-        }
-    }
-
-    private fun acceptOffer(card: AccessibilityNodeInfo): Boolean {
-        // Strategy 1: find a clickable button within the card that looks like Accept
-        val btn = findAcceptButton(card)
-        if (btn != null) {
-            Log.d(TAG, "Clicking accept button via ACTION_CLICK")
-            btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            return true
-        }
-
-        // Strategy 2: click the card itself to open detail, then find accept on detail screen
-        if (card.isClickable) {
-            Log.d(TAG, "Clicking card to open detail view")
-            card.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            handler.postDelayed({ clickAcceptOnDetailScreen() }, 1500)
-            return true
-        }
-
-        // Strategy 3: tap the center of the card's bounding rect
-        val rect = android.graphics.Rect()
-        card.getBoundsInScreen(rect)
-        if (!rect.isEmpty) {
-            Log.d(TAG, "Tapping card center via gesture: ${rect.centerX()},${rect.centerY()}")
-            performTap(rect.centerX().toFloat(), rect.centerY().toFloat())
-            handler.postDelayed({ clickAcceptOnDetailScreen() }, 1500)
-            return true
-        }
-
-        return false
-    }
-
-    private fun findAcceptButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        // Look for the blue arrow/accept button — it's usually a circular ImageButton
-        val desc = (node.contentDescription?.toString() ?: "").lowercase()
-        val className = (node.className?.toString() ?: "").lowercase()
-        if (node.isClickable &&
-            (desc.contains("accept") || desc.contains("confirm") || desc.contains("arrow") ||
-             className.contains("imagebutton") || className.contains("imageview"))
-        ) {
-            return node
-        }
-        for (i in 0 until node.childCount) {
-            val found = findAcceptButton(node.getChild(i) ?: continue)
-            if (found != null) return found
-        }
-        return null
-    }
-
-    private fun clickAcceptOnDetailScreen() {
-        val root = rootInActiveWindow ?: return
-        // On detail screen look for a slide-to-accept or accept button
-        val btn = findNodeByText(root, "accept", "slide", "confirm", "book")
-        if (btn != null) {
-            btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.d(TAG, "Accepted on detail screen")
-        } else {
-            // Try swipe gesture for slide-to-accept
-            performSlideGesture()
-        }
-    }
-
-    private fun findNodeByText(root: AccessibilityNodeInfo, vararg keywords: String): AccessibilityNodeInfo? {
-        val text = (root.text?.toString() ?: "").lowercase() +
-                   (root.contentDescription?.toString() ?: "").lowercase()
-        if (root.isClickable && keywords.any { text.contains(it) }) return root
-        for (i in 0 until root.childCount) {
-            val found = findNodeByText(root.getChild(i) ?: continue, *keywords)
-            if (found != null) return found
-        }
-        return null
     }
 
     private fun performTap(x: Float, y: Float) {
@@ -227,22 +207,6 @@ class BlacklaneAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
-    private fun performSlideGesture() {
-        val display = resources.displayMetrics
-        val w = display.widthPixels.toFloat()
-        val h = display.heightPixels.toFloat()
-        // Slide from left-center to right-center of lower third of screen
-        val y = h * 0.75f
-        val path = Path().apply {
-            moveTo(w * 0.1f, y)
-            lineTo(w * 0.85f, y)
-        }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 500)
-        val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
-        Log.d(TAG, "Performed slide gesture")
-    }
-
     private fun notifyMainActivity(message: String) {
         val intent = android.content.Intent("com.blacklanebot.BOT_ACTION")
         intent.putExtra("message", message)
@@ -250,6 +214,6 @@ class BlacklaneAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "Service interrupted")
+        Log.i(TAG, "Service interrupted")
     }
 }

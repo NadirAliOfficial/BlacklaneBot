@@ -3,7 +3,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Main bot UI -->
     <ScrollView
         android:id="@+id/mainContent"
         android:layout_width="match_parent"
@@ -23,7 +22,15 @@
                 android:textSize="22sp"
                 android:textStyle="bold"
                 android:layout_marginTop="32dp"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="by TEAM NAK"
+                android:textSize="12sp"
+                android:textColor="#888888"
+                android:layout_marginBottom="20dp" />
 
             <!-- Status indicators -->
             <LinearLayout
@@ -143,63 +150,140 @@
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="16dp" />
 
-            <Button
-                android:id="@+id/btnTest"
+            <!-- Live log panel -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Run Test (Mock Offers)"
-                android:backgroundTint="#388E3C"
-                android:textColor="#FFFFFF"
-                android:layout_marginBottom="8dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Live Log"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#333333" />
+                <Button
+                    android:id="@+id/btnClearLog"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:text="Clear"
+                    android:textSize="11sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp" />
+            </LinearLayout>
+
+            <ScrollView
+                android:id="@+id/logScroll"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:background="#111111"
+                android:padding="8dp"
+                android:layout_marginBottom="24dp">
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="11sp"
+                    android:textColor="#00FF00"
+                    android:fontFamily="monospace" />
+            </ScrollView>
+
+            <!-- Contact footer -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#DDDDDD"
+                android:layout_marginBottom="12dp" />
 
             <TextView
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sends 5 mock offers — 2 Canada in window (auto-accepted), 3 filtered out"
-                android:textSize="11sp"
-                android:textColor="#888888"
-                android:gravity="center"
-                android:layout_marginBottom="16dp" />
+                android:text="Support"
+                android:textSize="12sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="theteamnak.com"
+                android:textSize="13sp"
+                android:textColor="#1565C0"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+92 304 2019543"
+                android:textSize="13sp"
+                android:textColor="#333333"
+                android:layout_marginBottom="24dp" />
 
         </LinearLayout>
     </ScrollView>
 
-    <!-- Expiry overlay — shown on top when trial ends -->
+    <!-- Expiry overlay -->
     <LinearLayout
         android:id="@+id/expiredOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="#CC000000"
-        android:padding="32dp"
+        android:background="#EE000000"
+        android:padding="40dp"
         android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Trial Expired"
-            android:textSize="28sp"
+            android:text="Trial Period Ended"
+            android:textSize="26sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Your 3-day trial has ended.\nContact the developer to get the full version."
-            android:textSize="16sp"
-            android:textColor="#DDDDDD"
+            android:text="Your free trial has expired.\nContact us to continue using the bot."
+            android:textSize="15sp"
+            android:textColor="#CCCCCC"
             android:gravity="center"
             android:layout_marginBottom="32dp" />
 
+        <View
+            android:layout_width="60dp"
+            android:layout_height="1dp"
+            android:background="#444444"
+            android:layout_marginBottom="28dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="nadiralikhanofficial@gmail.com"
-            android:textSize="14sp"
-            android:textColor="#90CAF9"
-            android:gravity="center" />
+            android:text="theteamnak.com"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#64B5F6"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+92 304 2019543"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WhatsApp / Call"
+            android:textSize="12sp"
+            android:textColor="#888888" />
 
     </LinearLayout>
 
