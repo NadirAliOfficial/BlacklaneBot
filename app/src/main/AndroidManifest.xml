@@ -45,6 +45,11 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <activity
+            android:name=".MockBlacklaneActivity"
+            android:exported="false"
+            android:label="Offers" />
+
         <!-- Boot receiver to restart bot after reboot -->
         <receiver
             android:name=".BootReceiver"

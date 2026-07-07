@@ -40,7 +40,11 @@ class BlacklaneAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.packageName != BotConfig.BLACKLANE_PACKAGE) return
+        val pkg = event.packageName?.toString() ?: return
+        val isBlacklane = pkg == BotConfig.BLACKLANE_PACKAGE
+        val isMock = pkg == packageName // bot's own mock activity
+
+        if (!isBlacklane && !isMock) return
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,

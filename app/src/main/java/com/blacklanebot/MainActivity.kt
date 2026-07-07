@@ -74,6 +74,12 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
         }
 
+        TestNotificationHelper.createChannel(this)
+
+        findViewById<Button>(R.id.btnTest).setOnClickListener {
+            TestNotificationHelper.sendMockNotification(this)
+        }
+
         registerReceiver(botReceiver, IntentFilter("com.blacklanebot.BOT_ACTION"))
     }
 

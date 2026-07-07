@@ -136,6 +136,31 @@
                 android:textColor="#AAAAAA"
                 android:layout_marginTop="8dp" />
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#DDDDDD"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/btnTest"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Run Test (Mock Offers)"
+                android:backgroundTint="#388E3C"
+                android:textColor="#FFFFFF"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sends 5 mock offers — 2 Canada in window (auto-accepted), 3 filtered out"
+                android:textSize="11sp"
+                android:textColor="#888888"
+                android:gravity="center"
+                android:layout_marginBottom="16dp" />
+
         </LinearLayout>
     </ScrollView>
 
